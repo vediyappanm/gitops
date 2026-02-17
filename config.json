@@ -1,0 +1,19 @@
+{
+  "risk_threshold": 9,
+  "protected_repositories": [],
+  "slack_channels": {
+    "alerts": "#ci-cd-alerts",
+    "approvals": "#ci-cd-approvals",
+    "critical": "#critical-alerts"
+  },
+  "approval_timeout_hours": 24,
+  "polling_interval_minutes": 1,
+  "repositories": [
+    {
+      "owner": "vediyappanm",
+      "name": "UltraThinking-LLM-Training",
+      "branch": "main",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "risk_threshold": 5,
+  "protected_repositories": [
+    "critical/production-repo",
+    "critical/payment-system"
+  ],
+  "slack_channels": {
+    "alerts": "#ci-cd-alerts",
+    "approvals": "#ci-cd-approvals",
+    "critical": "#critical-alerts"
+  },
+  "approval_timeout_hours": 24,
+  "polling_interval_minutes": 5,
+  "retry_count": 3,
+  "retry_backoff_seconds": 1,
+  "repository_configs": {
+    "critical/production-repo": {
+      "risk_threshold": 3,
+      "protected": true
+    },
+    "team/internal-tools": {
+      "risk_threshold": 6,
+      "protected": false
+    }
+  }
+}
