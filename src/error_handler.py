@@ -2,7 +2,7 @@
 import logging
 import time
 from typing import Callable, Any, Optional
-from src.notifier import SlackNotifier
+from src.telegram_notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ErrorHandler:
     """Handle errors and implement recovery strategies"""
 
-    def __init__(self, notifier: Optional[SlackNotifier] = None):
+    def __init__(self, notifier: Optional[TelegramNotifier] = None):
         """Initialize error handler"""
         self.notifier = notifier
 

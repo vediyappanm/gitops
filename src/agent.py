@@ -12,7 +12,7 @@ from src.safety_gate import SafetyGate
 from src.approval_workflow import ApprovalWorkflow
 from src.executor import RemediationExecutor
 from src.pr_creator import PRCreator
-from src.notifier import SlackNotifier
+from src.telegram_notifier import TelegramNotifier
 from src.audit_logger import AuditLogger
 from src.metrics_tracker import MetricsTracker
 from src.error_handler import ErrorHandler
@@ -44,7 +44,11 @@ class CICDFailureMonitorAgent:
         
         # Initialize components
         self.github_client = GitHubClient(config.config.github_token)
-        self.notifier = SlackNotifier(config.config.slack_bot_token, config)
+        if config.config.telegram_bot_token:
+            self.notifier = TelegramNotifier(config.config.telegram_bot_token, config)
+        else:
+            from src.notifier import SlackNotifier
+            self.notifier = SlackNotifier(config.config.slack_bot_token, config)
         self.monitor = Monitor(self.github_client, db, config)
         self.analyzer = Analyzer(config.config.groq_api_key, db, self.github_client)
         self.safety_gate = SafetyGate(config)

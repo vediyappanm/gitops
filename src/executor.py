@@ -4,7 +4,7 @@ import subprocess
 from typing import Tuple, Optional
 from src.models import FailureRecord, AnalysisResult
 from src.database import Database
-from src.notifier import SlackNotifier
+from src.telegram_notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class RemediationExecutor:
     """Execute approved remediations"""
 
-    def __init__(self, database: Database, notifier: SlackNotifier):
+    def __init__(self, database: Database, notifier: TelegramNotifier):
         """Initialize executor"""
         self.database = database
         self.notifier = notifier

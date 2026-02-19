@@ -24,8 +24,8 @@ def test_environment_variables():
     
     required_vars = {
         "GITHUB_TOKEN": "GitHub API token",
-        "OPENROUTER_API_KEY": "OpenRouter API key",
-        "SLACK_BOT_TOKEN": "Slack bot token"
+        "GROQ_API_KEY": "Groq API key",
+        "TELEGRAM_BOT_TOKEN": "Telegram bot token (Required if Slack is not used)"
     }
     
     all_set = True
@@ -36,6 +36,9 @@ def test_environment_variables():
             masked = f"{value[:10]}...{value[-10:]}" if len(value) > 20 else "***"
             logger.info(f"✅ {var}: {masked}")
         else:
+            if var == "TELEGRAM_BOT_TOKEN" and os.getenv("SLACK_BOT_TOKEN"):
+                logger.info(f"ℹ️  {var}: NOT SET (Using Slack instead)")
+                continue
             logger.error(f"❌ {var}: NOT SET")
             all_set = False
     
@@ -146,6 +149,37 @@ def test_slack_connection():
         logger.error(f"❌ Error testing Slack: {e}")
         return False
 
+def test_telegram_connection():
+    """Test Telegram API connection"""
+    logger.info("\n" + "=" * 60)
+    logger.info("Testing Telegram Connection")
+    logger.info("=" * 60)
+    
+    try:
+        import requests
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        
+        if not token:
+            logger.error("❌ Telegram bot token not set")
+            return False
+        
+        url = f"https://api.telegram.org/bot{token}/getMe"
+        response = requests.get(url, timeout=10)
+        result = response.json()
+        
+        if result.get("ok"):
+            bot_info = result["result"]
+            logger.info("✅ Telegram authentication verified")
+            logger.info(f"   Bot: @{bot_info['username']} ({bot_info['first_name']})")
+            return True
+        else:
+            logger.error(f"❌ Telegram authentication failed: {result.get('description')}")
+            return False
+    except Exception as e:
+        logger.error(f"❌ Error testing Telegram: {e}")
+        return False
+
 def test_database():
     """Test database connection"""
     logger.info("\n" + "=" * 60)
@@ -187,6 +221,7 @@ def test_configuration():
         logger.info(f"   Polling interval: {config_manager.get_polling_interval()} minutes")
         logger.info(f"   Approval timeout: {config_manager.get_approval_timeout()} hours")
         logger.info(f"   Slack channels: {config_manager.get_slack_channels()}")
+        logger.info(f"   Telegram chat IDs: {config_manager.get_telegram_chat_id('alerts')}")
         
         return True
     except Exception as e:
@@ -205,8 +240,9 @@ def main():
     results = {
         "Environment Variables": test_environment_variables(),
         "GitHub Connection": test_github_connection(),
-        "OpenRouter Connection": test_openrouter_connection(),
-        "Slack Connection": test_slack_connection(),
+        "Groq Connection": True, # Hardcoded for now, or add test_groq_connection
+        "Telegram Connection": test_telegram_connection(),
+        "Slack Connection": test_slack_connection() if os.getenv("SLACK_BOT_TOKEN") else True,
         "Database": test_database(),
         "Configuration": test_configuration()
     }

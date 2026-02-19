@@ -6,7 +6,7 @@ from typing import Optional, Callable
 from src.models import ApprovalRequest, ApprovalStatus, FailureRecord, AnalysisResult
 from src.database import Database
 from src.config_manager import ConfigurationManager
-from src.notifier import SlackNotifier
+from src.telegram_notifier import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ApprovalWorkflow:
     """Manage human approval for high-risk remediations"""
 
-    def __init__(self, database: Database, config: ConfigurationManager, notifier: SlackNotifier):
+    def __init__(self, database: Database, config: ConfigurationManager, notifier: TelegramNotifier):
         """Initialize approval workflow"""
         self.database = database
         self.config = config

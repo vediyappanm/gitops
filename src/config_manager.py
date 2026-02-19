@@ -22,13 +22,19 @@ class Configuration:
     """System configuration"""
     github_token: str
     groq_api_key: str
-    slack_bot_token: str
+    slack_bot_token: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
     risk_threshold: int = 5
     protected_repositories: list = field(default_factory=list)
     slack_channels: Dict[str, str] = field(default_factory=lambda: {
         "alerts": "#ci-cd-alerts",
         "approvals": "#ci-cd-approvals",
         "critical": "#critical-alerts"
+    })
+    telegram_chat_ids: Dict[str, str] = field(default_factory=lambda: {
+        "alerts": "",
+        "approvals": "",
+        "critical": ""
     })
     approval_timeout_hours: int = 24
     polling_interval_minutes: int = 5
@@ -42,8 +48,8 @@ class Configuration:
             raise ValueError("GitHub token is required")
         if not self.groq_api_key:
             raise ValueError("Groq API key is required")
-        if not self.slack_bot_token:
-            raise ValueError("Slack bot token is required")
+        if not self.slack_bot_token and not self.telegram_bot_token:
+            raise ValueError("Either Slack bot token or Telegram bot token must be provided")
         if not (0 <= self.risk_threshold <= 10):
             raise ValueError("Risk threshold must be between 0 and 10")
         if self.approval_timeout_hours <= 0:
@@ -69,21 +75,28 @@ class ConfigurationManager:
         github_token = os.getenv("GITHUB_TOKEN")
         groq_api_key = os.getenv("GROQ_API_KEY")
         slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
+        telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         
-        if not all([github_token, groq_api_key, slack_bot_token]):
-            raise ValueError("Required environment variables not set: GITHUB_TOKEN, GROQ_API_KEY, SLACK_BOT_TOKEN")
+        if not all([github_token, groq_api_key]) or (not slack_bot_token and not telegram_bot_token):
+            raise ValueError("Required environment variables not set: GITHUB_TOKEN, GROQ_API_KEY, and either SLACK_BOT_TOKEN or TELEGRAM_BOT_TOKEN")
         
         # Load from config file if it exists
         config_data = {
             "github_token": github_token,
             "groq_api_key": groq_api_key,
             "slack_bot_token": slack_bot_token,
+            "telegram_bot_token": telegram_bot_token,
             "risk_threshold": 5,
             "protected_repositories": [],
             "slack_channels": {
                 "alerts": "#ci-cd-alerts",
                 "approvals": "#ci-cd-approvals",
                 "critical": "#critical-alerts"
+            },
+            "telegram_chat_ids": {
+                "alerts": os.getenv("TELEGRAM_CHAT_ID", ""),
+                "approvals": os.getenv("TELEGRAM_CHAT_ID", ""),
+                "critical": os.getenv("TELEGRAM_CHAT_ID", "")
             },
             "approval_timeout_hours": 24,
             "polling_interval_minutes": 5,
@@ -172,11 +185,11 @@ class ConfigurationManager:
             raise RuntimeError("Configuration not loaded")
         return self.config.slack_channels
 
-    def get_slack_channel(self, channel_type: str) -> str:
-        """Get specific Slack channel"""
+    def get_telegram_chat_id(self, channel_type: str) -> str:
+        """Get specific Telegram chat ID"""
         if not self.config:
             raise RuntimeError("Configuration not loaded")
-        return self.config.slack_channels.get(channel_type, "#ci-cd-alerts")
+        return self.config.telegram_chat_ids.get(channel_type, "")
 
     def get_approval_timeout(self) -> int:
         """Get approval timeout in hours"""
