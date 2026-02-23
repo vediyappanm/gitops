@@ -1,7 +1,7 @@
 """Approval Workflow component for managing human approvals"""
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable
 from src.models import ApprovalRequest, ApprovalStatus, FailureRecord, AnalysisResult
 from src.database import Database
@@ -31,8 +31,8 @@ class ApprovalWorkflow:
             failure_id=failure.failure_id,
             analysis_id=failure.failure_id,  # Using failure_id as analysis_id for simplicity
             status=ApprovalStatus.PENDING,
-            requested_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(hours=timeout_hours)
+            requested_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=timeout_hours)
         )
         
         # Send Slack notification
@@ -54,7 +54,7 @@ class ApprovalWorkflow:
         
         request.status = ApprovalStatus.APPROVED
         request.approved_by = approved_by
-        request.approved_at = datetime.utcnow()
+        request.approved_at = datetime.now(timezone.utc)
         
         self.database.store_approval_request(request)
         logger.info(f"Approval granted for request {request_id} by {approved_by}")
@@ -74,7 +74,7 @@ class ApprovalWorkflow:
         
         request.status = ApprovalStatus.REJECTED
         request.approved_by = rejected_by
-        request.approved_at = datetime.utcnow()
+        request.approved_at = datetime.now(timezone.utc)
         
         self.database.store_approval_request(request)
         logger.info(f"Approval rejected for request {request_id} by {rejected_by}")
@@ -90,7 +90,11 @@ class ApprovalWorkflow:
         if request.status != ApprovalStatus.PENDING:
             return False
         
-        if datetime.utcnow() > request.expires_at:
+        expires_at = request.expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+            
+        if datetime.now(timezone.utc) > expires_at:
             request.status = ApprovalStatus.EXPIRED
             self.database.store_approval_request(request)
             
@@ -111,7 +115,7 @@ class ApprovalWorkflow:
     def wait_for_approval(self, request_id: str, timeout_seconds: int = 300) -> Optional[ApprovalRequest]:
         """Wait for approval response (blocking)"""
         import time
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         while True:
             request = self.database.get_approval_request(request_id)
@@ -119,7 +123,7 @@ class ApprovalWorkflow:
             if request and request.status != ApprovalStatus.PENDING:
                 return request
             
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             if elapsed > timeout_seconds:
                 return None
             

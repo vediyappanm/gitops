@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 class Analyzer:
     """Analyze failures using Groq API"""
 
-    def __init__(self, groq_api_key: str, database: Database, github_client=None):
+    def __init__(self, groq_api_key: str, database: Database, github_client=None,
+                 failure_pattern_memory=None):
         """Initialize analyzer"""
         self.api_key = groq_api_key.strip()
         self.database = database
         self.github_client = github_client
+        self.failure_pattern_memory = failure_pattern_memory
         self.model = "llama-3.3-70b-versatile"  # Groq model
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -162,7 +164,20 @@ Output only the full fixed file content. No markdown, no explanations."""
         """Build analysis prompt for Groq"""
         repo_structure = self._get_repo_structure(failure.repository)
         
-        return f"""Analyze this CI/CD workflow failure. 
+        # Get historical context if available
+        historical_context = ""
+        if self.failure_pattern_memory:
+            try:
+                historical_context = self.failure_pattern_memory.get_historical_context(
+                    failure.failure_reason,
+                    "unknown",  # Category not known yet
+                    failure.repository
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get historical context: {e}")
+                historical_context = ""
+        
+        prompt = f"""Analyze this CI/CD workflow failure. 
 
 Repository: {failure.repository}
 Branch: {failure.branch}
@@ -170,7 +185,12 @@ Commit: {failure.commit_sha}
 Failure Reason: {failure.failure_reason}
 
 Repository Structure (Key Files):
-{repo_structure}
+{repo_structure}"""
+        
+        if historical_context:
+            prompt += f"\n\n{historical_context}"
+        
+        prompt += """
 
 CLASSIFICATION RULES:
 - DEVOPS: Infrastructure, deployment, CI/CD config (.github/workflows/*.yml, Dockerfile, docker-compose.yml, requirements.txt, package.json), dependencies, timeouts, environment issues.
@@ -194,6 +214,8 @@ Logs (last part):
 {failure.logs[-5000:]}
 
 OUTPUT ONLY THE JSON OBJECT. NO MARKDOWN. NO PREAMBLE. NO FENCES."""
+        
+        return prompt
 
     def _get_repo_structure(self, repo: str) -> str:
         """Get flattened repository structure for key areas"""

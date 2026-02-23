@@ -1,7 +1,7 @@
 """Metrics Tracker component for collecting system metrics"""
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from src.models import MetricsRecord
 from src.database import Database
@@ -142,7 +142,7 @@ class PerformanceMetrics:
 
     def calculate_kpis(self) -> Dict[str, Any]:
         """Calculate key performance indicators for the last 30 days"""
-        last_30_days = datetime.utcnow() - timedelta(days=30)
+        last_30_days = datetime.now(timezone.utc) - timedelta(days=30)
         
         metrics = self.database.get_metrics()
         recent_metrics = [m for m in metrics if m.recorded_at > last_30_days]

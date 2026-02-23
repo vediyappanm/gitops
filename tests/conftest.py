@@ -31,6 +31,7 @@ def sample_analysis():
     """Create a sample analysis result"""
     return AnalysisResult(
         failure_id="test-failure-1",
+        error_type="DEVOPS",
         category=FailureCategory.TIMEOUT,
         risk_score=3,
         confidence=85,

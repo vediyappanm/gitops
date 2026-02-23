@@ -47,31 +47,9 @@ class PRCreator:
 
     def _create_branch(self, failure: FailureRecord, analysis: AnalysisResult) -> Optional[str]:
         """Create a new branch for the fix"""
-        try:
-            # Get the latest commit SHA from the failure's branch
-            url = f"https://api.github.com/repos/{failure.repository}/git/refs/heads/{failure.branch}"
-            response = self.github_client.session.get(url)
-            response.raise_for_status()
-            
-            latest_sha = response.json()["object"]["sha"]
-            
-            # Create new branch
-            branch_name = f"fix/ci-failure-{failure.failure_id[:8]}"
-            
-            create_branch_url = f"https://api.github.com/repos/{failure.repository}/git/refs"
-            branch_data = {
-                "ref": f"refs/heads/{branch_name}",
-                "sha": latest_sha
-            }
-            
-            response = self.github_client.session.post(create_branch_url, json=branch_data)
-            response.raise_for_status()
-            
-            logger.info(f"Created branch: {branch_name}")
-            return branch_name
-        except Exception as e:
-            logger.error(f"Failed to create branch: {e}")
-            return None
+        return self.github_client.create_fix_branch_from_broken(
+            failure.repository, failure.branch
+        )
 
     def _modify_files(self, failure: FailureRecord, analysis: AnalysisResult, branch_name: str) -> bool:
         """Modify files with the AI-generated fix"""
@@ -80,20 +58,20 @@ class PRCreator:
             
             for file_path in analysis.files_to_modify:
                 # Get current file content
-                url = f"https://api.github.com/repos/{failure.repository}/contents/{file_path}"
-                params = {"ref": branch_name}
+                current_content = self.github_client.get_file_contents(
+                    failure.repository, file_path, ref=branch_name
+                )
                 
-                response = self.github_client.session.get(url, params=params)
-                
-                if response.status_code == 404:
+                if current_content is None:
                     logger.warning(f"File not found in repo: {file_path}, skipping")
                     continue
-                    
-                response.raise_for_status()
                 
-                file_data = response.json()
-                current_content = base64.b64decode(file_data["content"]).decode("utf-8")
-                sha = file_data["sha"]
+                # Get SHA for update (we need to get details again because we need the SHA)
+                url = f"https://api.github.com/repos/{failure.repository}/contents/{file_path}"
+                params = {"ref": branch_name}
+                response = self.github_client.session.get(url, params=params)
+                response.raise_for_status()
+                sha = response.json().get("sha")
                 
                 # Use AI to generate the actual fixed content
                 if self.analyzer:
@@ -110,19 +88,14 @@ class PRCreator:
                     continue
                 
                 # Update file on the branch
-                update_url = f"https://api.github.com/repos/{failure.repository}/contents/{file_path}"
-                update_data = {
-                    "message": f"fix: {analysis.category.value} - {analysis.reasoning[:80]}",
-                    "content": base64.b64encode(new_content.encode()).decode(),
-                    "sha": sha,
-                    "branch": branch_name
-                }
+                message = f"fix: {analysis.category.value} - {analysis.reasoning[:80]}"
+                success = self.github_client.update_file(
+                    failure.repository, file_path, new_content, message, branch_name, sha
+                )
                 
-                response = self.github_client.session.put(update_url, json=update_data)
-                response.raise_for_status()
-                
-                files_modified += 1
-                logger.info(f"Updated file: {file_path}")
+                if success:
+                    files_modified += 1
+                    logger.info(f"Updated file: {file_path}")
             
             if files_modified == 0:
                 logger.warning("No files were actually modified")
@@ -159,25 +132,13 @@ class PRCreator:
 
     def _create_pull_request(self, failure: FailureRecord, analysis: AnalysisResult, 
                             branch_name: str) -> Optional[str]:
-        """Create a pull request"""
-        try:
-            pr_data = {
-                "title": f"🔧 Auto-fix CI failure: {analysis.category.value}",
-                "body": self._build_pr_description(failure, analysis),
-                "head": branch_name,
-                "base": failure.branch
-            }
-            
-            url = f"https://api.github.com/repos/{failure.repository}/pulls"
-            response = self.github_client.session.post(url, json=pr_data)
-            response.raise_for_status()
-            
-            pr_url = response.json()["html_url"]
-            logger.info(f"Created pull request: {pr_url}")
-            return pr_url
-        except Exception as e:
-            logger.error(f"Failed to create pull request: {e}")
-            return None
+        """Create a pull request targeting the teammate's branch"""
+        title = f"🤖 Agent Fix: {failure.branch}"
+        body = self._build_pr_description(failure, analysis)
+        
+        return self.github_client.create_pull_request(
+            failure.repository, title, body, branch_name, failure.branch
+        )
 
     def _build_pr_description(self, failure: FailureRecord, analysis: AnalysisResult) -> str:
         """Build pull request description with comprehensive metadata"""

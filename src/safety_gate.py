@@ -1,6 +1,6 @@
 """Safety Gate component for validating remediations"""
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 from src.models import FailureRecord, AnalysisResult
 from src.config_manager import ConfigurationManager
 
@@ -10,9 +10,10 @@ logger = logging.getLogger(__name__)
 class SafetyGate:
     """Validate that remediations are safe before execution"""
 
-    def __init__(self, config: ConfigurationManager):
+    def __init__(self, config: ConfigurationManager, circuit_breaker=None):
         """Initialize safety gate"""
         self.config = config
+        self.circuit_breaker = circuit_breaker
 
     def validate_remediation(self, failure: FailureRecord, analysis: AnalysisResult) -> Tuple[bool, str]:
         """Run all safety checks"""
@@ -20,6 +21,7 @@ class SafetyGate:
             self._check_risk_score(failure, analysis),
             self._check_protected_repository(failure),
             self._check_has_files_to_modify(analysis),
+            self._check_branch_protection(failure),
         ]
         
         for passed, reason in checks:
@@ -53,3 +55,11 @@ class SafetyGate:
             return False, "No files identified for modification - manual review needed"
         
         return True, f"Files to modify: {', '.join(analysis.files_to_modify)}"
+
+    def _check_branch_protection(self, failure: FailureRecord) -> Tuple[bool, str]:
+        """Check if branch is protected (e.g., main)"""
+        # Strictly forbid remediations on main branch
+        if failure.branch == "main":
+            return False, "Remediation on 'main' branch is strictly forbidden"
+        
+        return True, f"Branch '{failure.branch}' is not restricted"

@@ -15,6 +15,7 @@ class RepositoryConfig:
     name: str
     risk_threshold: Optional[int] = None
     protected: bool = False
+    branch: Optional[str] = None
 
 
 @dataclass
@@ -127,7 +128,8 @@ class ConfigurationManager:
                     repo_configs[repo_name] = RepositoryConfig(
                         name=repo_name,
                         risk_threshold=repo.get("risk_threshold"),
-                        protected=repo.get("protected", False)
+                        protected=repo.get("protected", False),
+                        branch=repo.get("branch")
                     )
             del config_data["repositories"]
         
@@ -136,7 +138,8 @@ class ConfigurationManager:
                 repo_configs[repo_name] = RepositoryConfig(
                     name=repo_name,
                     risk_threshold=repo_config.get("risk_threshold"),
-                    protected=repo_config.get("protected", False)
+                    protected=repo_config.get("protected", False),
+                    branch=repo_config.get("branch")
                 )
         
         config_data["repository_configs"] = repo_configs
@@ -156,6 +159,22 @@ class ConfigurationManager:
         if not self.config:
             raise RuntimeError("Configuration not loaded")
         return self.config.risk_threshold
+
+    def get_repository_config(self, repo: str) -> Dict[str, Any]:
+        """Get configuration for a specific repository"""
+        if not self.config:
+            raise RuntimeError("Configuration not loaded")
+        
+        if repo in self.config.repository_configs:
+            config = self.config.repository_configs[repo]
+            return {
+                "name": config.name,
+                "risk_threshold": config.risk_threshold,
+                "protected": config.protected,
+                "branch": config.branch
+            }
+        
+        return {}
 
     def get_repo_risk_threshold(self, repo: str) -> int:
         """Get repository-specific risk threshold or global threshold"""

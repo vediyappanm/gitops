@@ -1,7 +1,7 @@
 """Audit Logger component for comprehensive logging"""
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from src.models import AuditLogEntry, ActionType
 from src.database import Database
@@ -24,7 +24,7 @@ class AuditLogger:
         
         entry = AuditLogEntry(
             log_id=log_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=actor,
             action_type=action_type,
             failure_id=failure_id,

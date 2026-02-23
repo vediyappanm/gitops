@@ -1,6 +1,6 @@
 """Unit tests for database layer"""
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from src.database import Database
 from src.models import (
     FailureRecord, AnalysisResult, ApprovalRequest, AuditLogEntry, MetricsRecord,
@@ -103,7 +103,7 @@ class TestAuditLogPersistence:
         """Test storing and querying audit logs"""
         log_entry = AuditLogEntry(
             log_id="log-1",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor="monitor",
             action_type=ActionType.DETECTION,
             failure_id="fail-1",
@@ -122,7 +122,7 @@ class TestAuditLogPersistence:
         """Test filtering audit logs by action type"""
         log1 = AuditLogEntry(
             log_id="log-1",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor="monitor",
             action_type=ActionType.DETECTION,
             failure_id="fail-1",
@@ -132,7 +132,7 @@ class TestAuditLogPersistence:
         )
         log2 = AuditLogEntry(
             log_id="log-2",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor="analyzer",
             action_type=ActionType.ANALYSIS,
             failure_id="fail-1",

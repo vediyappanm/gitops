@@ -1,7 +1,7 @@
 """Comprehensive property-based tests for all components"""
 import pytest
 from hypothesis import given, strategies as st, settings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.models import (
     FailureRecord, AnalysisResult, ApprovalRequest, AuditLogEntry, MetricsRecord,
     FailureStatus, FailureCategory, ApprovalStatus, ActionType
@@ -192,7 +192,7 @@ class TestApprovalWorkflowProperties:
             analysis_id=failure_id,
             status=ApprovalStatus.APPROVED,
             approved_by=approver,
-            approved_at=datetime.utcnow()
+            approved_at=datetime.now(timezone.utc)
         )
         
         assert request.approved_by == approver
@@ -218,7 +218,7 @@ class TestAuditLoggingProperties:
         """
         entry = AuditLogEntry(
             log_id=log_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=actor,
             action_type=ActionType.DETECTION,
             failure_id=failure_id,

@@ -1,5 +1,5 @@
 """Data models for CI/CD Failure Monitor"""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -55,8 +55,8 @@ class FailureRecord:
     failure_reason: str
     logs: str
     status: FailureStatus = FailureStatus.DETECTED
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -81,7 +81,7 @@ class AnalysisResult:
     reasoning: str
     files_to_modify: List[str] = field(default_factory=list)
     fix_commands: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -98,7 +98,7 @@ class ApprovalRequest:
     failure_id: str
     analysis_id: str
     status: ApprovalStatus = ApprovalStatus.PENDING
-    requested_at: datetime = field(default_factory=datetime.utcnow)
+    requested_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
@@ -150,7 +150,7 @@ class MetricsRecord:
     category: str
     repository: str
     risk_score: int
-    recorded_at: datetime = field(default_factory=datetime.utcnow)
+    recorded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -165,7 +165,7 @@ class Feedback:
     failure_id: str
     predicted_category: str
     actual_category: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""

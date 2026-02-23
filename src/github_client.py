@@ -69,7 +69,7 @@ class GitHubClient:
                     logger.warning(f"Rate limit reached. Waiting {wait_time} seconds")
                     time.sleep(wait_time + 1)
 
-    def get_failed_workflow_runs(self, repo: str, per_page: int = 30) -> List[Dict[str, Any]]:
+    def get_failed_workflow_runs(self, repo: str, branch: Optional[str] = None, per_page: int = 30) -> List[Dict[str, Any]]:
         """Fetch failed workflow runs from a repository"""
         try:
             url = f"{self.base_url}/repos/{repo}/actions/runs"
@@ -77,6 +77,8 @@ class GitHubClient:
                 "status": "failure",
                 "per_page": per_page
             }
+            if branch:
+                params["branch"] = branch
             
             response = self.session.get(url, params=params)
             self._handle_rate_limit(response)
@@ -206,6 +208,37 @@ class GitHubClient:
             logger.error(f"Failed to get file contents for {repo}/{path}: {e}")
             raise
 
+    def get_file_metadata(self, repo: str, path: str, ref: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get file metadata including SHA from repository"""
+        try:
+            url = f"{self.base_url}/repos/{repo}/contents/{path}"
+            params = {}
+            if ref:
+                params["ref"] = ref
+                
+            response = self.session.get(url, params=params)
+            self._handle_rate_limit(response)
+            
+            if response.status_code == 404:
+                return None
+                
+            response.raise_for_status()
+            data = response.json()
+            
+            if isinstance(data, dict) and data.get("type") == "file":
+                import base64
+                content = base64.b64decode(data["content"]).decode("utf-8")
+                return {
+                    "content": content,
+                    "sha": data.get("sha"),
+                    "path": data.get("path"),
+                    "size": data.get("size")
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get file metadata for {repo}/{path}: {e}")
+            raise
+
     def get_rate_limit_status(self) -> Dict[str, Any]:
         """Get current rate limit status"""
         try:
@@ -218,6 +251,122 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Failed to fetch rate limit status: {e}")
             raise
+
+    def update_file(self, repo: str, path: str, content: str, message: str, 
+                   branch: str, sha: str) -> bool:
+        """Update a file in the repository"""
+        try:
+            import base64
+            
+            url = f"{self.base_url}/repos/{repo}/contents/{path}"
+            
+            # Encode content to base64
+            content_bytes = content.encode('utf-8')
+            content_base64 = base64.b64encode(content_bytes).decode('utf-8')
+            
+            payload = {
+                "message": message,
+                "content": content_base64,
+                "sha": sha,
+                "branch": branch
+            }
+            
+            response = self.session.put(url, json=payload)
+            self._handle_rate_limit(response)
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Successfully updated file {path} in {repo}")
+                return True
+            else:
+                logger.error(f"Failed to update file {path}: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to update file {repo}/{path}: {e}")
+            return False
+
+    def create_file(self, repo: str, path: str, content: str, message: str, 
+                   branch: str) -> bool:
+        """Create a new file in the repository"""
+        try:
+            import base64
+            
+            url = f"{self.base_url}/repos/{repo}/contents/{path}"
+            
+            # Encode content to base64
+            content_bytes = content.encode('utf-8')
+            content_base64 = base64.b64encode(content_bytes).decode('utf-8')
+            
+            payload = {
+                "message": message,
+                "content": content_base64,
+                "branch": branch
+            }
+            
+            response = self.session.put(url, json=payload)
+            self._handle_rate_limit(response)
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Successfully created file {path} in {repo}")
+                return True
+            else:
+                logger.error(f"Failed to create file {path}: {response.status_code} - {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to create file {repo}/{path}: {e}")
+            return False
+
+    def create_fix_branch_from_broken(self, repo: str, broken_branch: str) -> Optional[str]:
+        """Create a new branch starting from the broken branch"""
+        try:
+            # Get latest SHA from the broken branch
+            url = f"{self.base_url}/repos/{repo}/git/refs/heads/{broken_branch}"
+            response = self.session.get(url)
+            self._handle_rate_limit(response)
+            response.raise_for_status()
+            
+            latest_sha = response.json()["object"]["sha"]
+            
+            # Use naming convention: agent-fix/<broken-branch>-<timestamp>
+            fix_branch_name = f"agent-fix/{broken_branch}-{int(time.time())}"
+            
+            create_branch_url = f"{self.base_url}/repos/{repo}/git/refs"
+            payload = {
+                "ref": f"refs/heads/{fix_branch_name}",
+                "sha": latest_sha
+            }
+            
+            response = self.session.post(create_branch_url, json=payload)
+            self._handle_rate_limit(response)
+            response.raise_for_status()
+            
+            logger.info(f"Created fix branch {fix_branch_name} from {broken_branch}")
+            return fix_branch_name
+        except Exception as e:
+            logger.error(f"Failed to create fix branch from {broken_branch}: {e}")
+            return None
+
+    def create_pull_request(self, repo: str, title: str, body: str, 
+                           head: str, base: str) -> Optional[str]:
+        """Create a pull request"""
+        try:
+            url = f"{self.base_url}/repos/{repo}/pulls"
+            payload = {
+                "title": title,
+                "body": body,
+                "head": head,
+                "base": base
+            }
+            
+            response = self.session.post(url, json=payload)
+            self._handle_rate_limit(response)
+            response.raise_for_status()
+            
+            pr_url = response.json()["html_url"]
+            logger.info(f"Created pull request: {pr_url}")
+            return pr_url
+        except Exception as e:
+            logger.error(f"Failed to create PR: {e}")
+            return None
 
     def close(self) -> None:
         """Close the session"""

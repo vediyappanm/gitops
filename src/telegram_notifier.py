@@ -180,3 +180,73 @@ class TelegramNotifier:
             text += f"\n\n<b>Error:</b> {self._escape(pr_url)}"
             
         return self._send_message(chat_id, text, reply_markup)
+
+    def send_circuit_breaker_alert(self, failure: FailureRecord, analysis: AnalysisResult, 
+                                   circuit_status: Dict[str, Any]) -> Optional[str]:
+        """Send circuit breaker triggered alert"""
+        chat_id = self.config.get_telegram_chat_id("critical")
+        
+        text = (
+            f"🔴 <b>CIRCUIT BREAKER TRIGGERED</b>\n\n"
+            f"<b>Repository:</b> {self._escape(failure.repository)}\n"
+            f"<b>Status:</b> Auto-remediation FROZEN\n"
+            f"<b>Reason:</b> Failure threshold reached\n\n"
+            f"<b>Circuit Status:</b>\n"
+            f"• Open Circuits: {circuit_status.get('open_circuits', 0)}\n"
+            f"• Total Circuits: {circuit_status.get('total_circuits', 0)}\n\n"
+            f"<b>Action Required:</b> Manual investigation needed\n"
+            f"Use manual reset command to resume auto-remediation"
+        )
+        
+        return self._send_message(chat_id, text)
+
+    def send_rollback_alert(self, remediation_id: str, reason: str) -> Optional[str]:
+        """Send rollback alert"""
+        chat_id = self.config.get_telegram_chat_id("critical")
+        
+        text = (
+            f"⚠️ <b>ROLLBACK TRIGGERED</b>\n\n"
+            f"<b>Remediation ID:</b> {self._escape(remediation_id)}\n"
+            f"<b>Reason:</b> {self._escape(reason)}\n\n"
+            f"<b>Action:</b> Changes have been reverted\n"
+            f"Repository restored to previous state"
+        )
+        
+        return self._send_message(chat_id, text)
+
+
+
+    def send_metric_alert(self, alert) -> Optional[str]:
+        """Send metric threshold alert"""
+        chat_id = self.config.get_telegram_chat_id("critical")
+        
+        severity_emoji = {
+            "info": "ℹ️",
+            "warning": "⚠️",
+            "critical": "🔴"
+        }
+        
+        emoji = severity_emoji.get(alert.severity.value if hasattr(alert.severity, 'value') else alert.severity, "⚠️")
+        
+        text = (
+            f"{emoji} <b>METRIC ALERT - {alert.severity.value.upper() if hasattr(alert.severity, 'value') else alert.severity.upper()}</b>\n\n"
+            f"<b>Metric:</b> {self._escape(alert.metric_name)}\n"
+            f"<b>Current Value:</b> {alert.current_value:.2f}\n"
+            f"<b>Threshold:</b> {alert.threshold_value:.2f}\n"
+        )
+        
+        if alert.repository:
+            text += f"<b>Repository:</b> {self._escape(alert.repository)}\n"
+        
+        text += f"\n<b>Message:</b> {self._escape(alert.message)}"
+        
+        return self._send_message(chat_id, text)
+
+
+    def send_health_report(self, report_message: str) -> Optional[str]:
+        """Send weekly health report"""
+        chat_id = self.config.get_telegram_chat_id("alerts")
+        
+        text = f"📊 <b>Weekly Health Report</b>\n\n{self._escape(report_message)}"
+        
+        return self._send_message(chat_id, text)

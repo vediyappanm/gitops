@@ -2,7 +2,7 @@
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from src.github_client import GitHubClient
 from src.database import Database
@@ -57,8 +57,11 @@ class Monitor:
         
         for repo in repositories:
             try:
-                logger.debug(f"Polling repository: {repo}")
-                runs = self.github_client.get_failed_workflow_runs(repo)
+                # Check if specific branch should be monitored
+                target_branch = self.config.get_repository_config(repo).get("branch")
+                
+                logger.debug(f"Polling repository: {repo} (branch: {target_branch or 'all'})")
+                runs = self.github_client.get_failed_workflow_runs(repo, branch=target_branch)
                 
                 for run in runs:
                     run_id = run.get("id")
@@ -67,6 +70,29 @@ class Monitor:
                     if self.database.failure_exists(str(run_id)):
                         logger.debug(f"Run {run_id} already processed, skipping")
                         continue
+                    
+                    # Skip runs older than 90 days (GitHub log retention period)
+                    run_date = run.get("created_at")
+                    if run_date:
+                        from dateutil import parser
+                        run_datetime = parser.parse(run_date)
+                        days_old = (datetime.now(timezone.utc) - run_datetime.replace(tzinfo=timezone.utc)).days
+                        if days_old > 90:
+                            logger.debug(f"Run {run_id} is {days_old} days old, skipping (logs likely expired)")
+                            # Mark as processed to avoid checking again
+                            dummy_failure = FailureRecord(
+                                failure_id=str(uuid.uuid4()),
+                                repository=repo,
+                                workflow_run_id=str(run_id),
+                                branch="unknown",
+                                commit_sha="unknown",
+                                failure_reason="Skipped - logs expired",
+                                logs="",
+                                status=FailureStatus.FAILED,
+                                created_at=datetime.now(timezone.utc)
+                            )
+                            self.database.store_failure(dummy_failure)
+                            continue
                     
                     # Fetch complete details
                     failure = self._process_workflow_run(repo, run)
@@ -103,7 +129,7 @@ class Monitor:
                     failure_reason="Logs unavailable (expired or deleted)",
                     logs="",
                     status=FailureStatus.FAILED,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
             
             # Extract failure reason
@@ -119,7 +145,7 @@ class Monitor:
                 failure_reason=failure_reason,
                 logs=logs,
                 status=FailureStatus.DETECTED,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             
             return failure

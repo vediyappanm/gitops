@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD Failure Monitor Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Fonts and Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i data-lucide="activity"></i>
+                <span>CI/CD Monitor</span>
+            </div>
+            
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('overview')">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Overview</span>
+                </li>
+                <li onclick="switchTab('feed')">
+                    <i data-lucide="list-video"></i>
+                    <span>Failures Feed</span>
+                </li>
+                <li onclick="switchTab('audit')">
+                    <i data-lucide="file-text"></i>
+                    <span>Audit Trail</span>
+                </li>
+                <li onclick="switchTab('repos')">
+                    <i data-lucide="git-branch"></i>
+                    <span>Repositories</span>
+                </li>
+            </ul>
+            
+            <div class="status-indicator">
+                <div class="status-dot online"></div>
+                <span>System Online</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Tab: Overview -->
+            <div id="tab-overview" class="tab-content active">
+                <header class="page-header">
+                    <h1>System Overview</h1>
+                    <div class="last-updated">Updated: <span id="last-updated-time">Just now</span></div>
+                </header>
+
+                <!-- KPI Grid -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Failures Today</div>
+                        <div class="kpi-value" id="kpi-failures-today">-</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Success Rate (24h)</div>
+                        <div class="kpi-value" id="kpi-success-rate">-</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Avg Repair Time</div>
+                        <div class="kpi-value" id="kpi-avg-time">-</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Open Circuits</div>
+                        <div class="kpi-value alert" id="kpi-open-circuits">-</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Patterns Learned</div>
+                        <div class="kpi-value" id="kpi-patterns">-</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Time Saved (30d)</div>
+                        <div class="kpi-value success" id="kpi-time-saved">-</div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 1 -->
+                <div class="charts-row">
+                    <div class="chart-card wide">
+                        <h3>Failure Frequency (24h)</h3>
+                        <canvas id="chart-timeline"></canvas>
+                    </div>
+                    <div class="chart-card narrow">
+                        <h3>Risk Distribution</h3>
+                        <canvas id="chart-risk"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Charts Row 2 -->
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3>Failure Categories</h3>
+                        <canvas id="chart-categories"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Pending Approvals</h3>
+                        <div id="pending-approvals-list" class="list-container">
+                            <div class="empty-state">No pending approvals</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Failures Feed -->
+            <div id="tab-feed" class="tab-content">
+                <header class="page-header">
+                    <h1>Failures Feed</h1>
+                    <div class="controls">
+                        <input type="text" placeholder="Filter by repo..." id="feed-repo-filter">
+                    </div>
+                </header>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Repository</th>
+                                <th>Workflow</th>
+                                <th>Reason</th>
+                                <th>Risk</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="failures-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Audit Trail -->
+            <div id="tab-audit" class="tab-content">
+                <header class="page-header">
+                    <h1>Audit Trail</h1>
+                </header>
+                
+                <div class="audit-list" id="audit-list-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Tab: Repositories -->
+            <div id="tab-repos" class="tab-content">
+                <header class="page-header">
+                    <h1>Repository Health</h1>
+                </header>
+                
+                <div class="repo-grid" id="repo-grid-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Failure Detail Modal -->
+    <div id="failure-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Failure Details</h2>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <!-- Repo Profile Modal -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="profile-title">Repository Profile</h2>
+            <div id="profile-body"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
